@@ -1,0 +1,36 @@
+# Local model assets and weight files
+models/
+*.safetensors
+*.gguf
+*.pt
+*.pth
+
+# Virtual environments
+qwen-env/
+.venv/
+venv/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Application and tool caches
+.cache/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Editor, OS, and runtime files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+*.log
