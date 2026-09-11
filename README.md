@@ -128,8 +128,13 @@ on the server. History stays in page memory and clears on refresh.
 
 If a request fails, its unanswered user turn is removed from both history
 and the display, and the message draft is restored for retrying. Failed
-requests never add an assistant message. Replies continue to display as
-plain text. Press **Ctrl+C** in each server window to stop it.
+requests never add an assistant message. User messages display as plain
+text. Qwen replies support a small Markdown subset: bold, headings (# to
+###), flat bullet and numbered lists, paragraphs, line breaks, and inline
+code. The renderer creates DOM elements and text nodes; raw HTML stays
+literal text, and links/images are not activated. This is not a full
+Markdown parser. History always stores Qwen's original unformatted response.
+Press **Ctrl+C** in each server window to stop it.
 
 ### Test the API directly
 
