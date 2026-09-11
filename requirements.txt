@@ -3,3 +3,5 @@ torch==2.13.0
 accelerate==1.14.0
 bitsandbytes==0.50.1
 transformers==5.15.0
+fastapi==0.141.1
+uvicorn==0.52.4

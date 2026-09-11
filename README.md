@@ -1,9 +1,9 @@
 # Local Qwen3-8B Chatbot
 
-A small multi-turn chatbot that runs Qwen3-8B locally with Hugging Face
-Transformers and PyTorch. It loads the model with 4-bit NF4 quantization,
-uses BF16 for computation, and keeps prior user and assistant messages as
-conversation context.
+A small chatbot that runs Qwen3-8B locally with Hugging Face Transformers
+and PyTorch. It loads the model with 4-bit NF4 quantization and uses BF16
+for computation. The terminal chatbot retains conversation context; the
+standalone browser prototype answers each message independently.
 
 ## Architecture
 
@@ -61,7 +61,7 @@ python -m pip install -r .\requirements.txt
 The current runtime also requires an NVIDIA GPU supported by BitsAndBytes for
 the configured 4-bit NF4 loading mode.
 
-## Run
+## Run the terminal chatbot
 
 From the project directory:
 
@@ -75,6 +75,75 @@ follow-up questions. Type `quit` or `exit` to stop.
 The virtual environment, model files, caches, and `.env` files are ignored
 because they are machine-specific, generated, very large, or potentially
 sensitive. Only the source and reproducibility documentation belong in Git.
+
+## Run the standalone web prototype
+
+The browser prototype uses plain HTML, CSS, and JavaScript with no frontend
+dependencies or build step. It stays separate from the Eiffel Tower school
+website and uses no API keys or external AI service.
+
+```text
+run_qwen.py       Local model loading, generation, and terminal chat
+server.py         FastAPI backend that reuses run_qwen.py
+web/
+  index.html     Chat page
+  style.css      Page styling
+  app.js         Browser requests and conversation display
+
+Browser -> JavaScript fetch -> FastAPI -> local Qwen3-8B -> browser
+```
+
+Install the dependencies using the Windows setup instructions above. Then
+open two PowerShell windows in the project directory.
+
+In the first window, start the backend:
+
+```powershell
+.\qwen-env\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 8000 --workers 1
+```
+
+Wait for `Application startup complete` and leave this window running.
+The tokenizer and model load once at startup, and generation requests are
+processed one at a time. Keep one worker and omit automatic reload to avoid
+extra model loads. After changing `server.py`, stop and restart the backend.
+
+In the second window, serve only the frontend directory:
+
+```powershell
+.\qwen-env\Scripts\python.exe -m http.server 5500 --bind 127.0.0.1 --directory web
+```
+
+Open [the local chat](http://127.0.0.1:5500/) in your browser. Use this HTTP
+address so the page has an allowed origin. CORS allows only
+`http://127.0.0.1:5500` and `http://localhost:5500`, with POST requests and
+the Content-Type header. Both servers bind to this computer's loopback
+address and should remain local during development.
+
+Click **Send** or press **Enter** to submit; **Shift+Enter** adds a new line.
+While Qwen generates, the controls are disabled and the page shows
+`Qwen is thinking...`. Errors restore the message draft for retrying.
+The visible conversation clears on refresh, and previous messages are not
+sent as model context. Press **Ctrl+C** in each server window to stop it.
+
+### Test the API directly
+
+With the backend running, use another PowerShell window:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:8000/chat" `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"message":"Hello"}' |
+  ConvertTo-Json
+```
+
+The request contains only a `message` string. The response has this shape;
+Qwen's wording will vary:
+
+```json
+{"response": "Hello! How can I help?"}
+```
 
 ## Known warning
 
