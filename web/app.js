@@ -7,6 +7,8 @@ const messages = document.querySelector("#messages");
 const emptyState = document.querySelector("#empty-state");
 const status = document.querySelector("#status");
 const errorNotice = document.querySelector("#error");
+// This page owns its history. A refresh starts with an empty conversation.
+const conversationHistory = [];
 let isGenerating = false;
 
 function updateSendButton() {
@@ -27,6 +29,7 @@ function addMessage(role, text) {
   message.append(label, content);
   messages.append(message);
   conversation.scrollTop = conversation.scrollHeight;
+  return message;
 }
 
 input.addEventListener("input", updateSendButton);
@@ -45,7 +48,8 @@ form.addEventListener("submit", async (event) => {
   isGenerating = true;
   errorNotice.hidden = true;
   errorNotice.textContent = "";
-  addMessage("user", message);
+  conversationHistory.push({ role: "user", content: message });
+  const userMessage = addMessage("user", message);
   input.value = "";
   input.disabled = true;
   updateSendButton();
@@ -55,7 +59,7 @@ form.addEventListener("submit", async (event) => {
     const result = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ messages: conversationHistory }),
     });
 
     if (!result.ok) {
@@ -72,7 +76,12 @@ form.addEventListener("submit", async (event) => {
       throw new Error("The server returned an empty or invalid answer. Please try again.");
     }
     addMessage("qwen", data.response);
+    conversationHistory.push({ role: "assistant", content: data.response });
   } catch (error) {
+    // Roll back the unanswered turn so retrying sends it exactly once.
+    conversationHistory.pop();
+    userMessage.remove();
+    emptyState.hidden = conversationHistory.length > 0;
     errorNotice.textContent = error instanceof TypeError
       ? "Could not reach Qwen. Check that the FastAPI server is running, then try again."
       : error.message || "Something went wrong. Please try again.";

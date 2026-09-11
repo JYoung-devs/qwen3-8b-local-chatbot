@@ -2,8 +2,8 @@
 
 A small chatbot that runs Qwen3-8B locally with Hugging Face Transformers
 and PyTorch. It loads the model with 4-bit NF4 quantization and uses BF16
-for computation. The terminal chatbot retains conversation context; the
-standalone browser prototype answers each message independently.
+for computation. Both the terminal chatbot and standalone browser prototype
+retain context during the current conversation.
 
 ## Architecture
 
@@ -121,9 +121,15 @@ address and should remain local during development.
 
 Click **Send** or press **Enter** to submit; **Shift+Enter** adds a new line.
 While Qwen generates, the controls are disabled and the page shows
-`Qwen is thinking...`. Errors restore the message draft for retrying.
-The visible conversation clears on refresh, and previous messages are not
-sent as model context. Press **Ctrl+C** in each server window to stop it.
+`Qwen is thinking...`. The browser keeps user and assistant messages in a
+JavaScript array and sends the whole conversation with each request. FastAPI
+validates that list and passes it to Qwen without storing any conversation
+on the server. History stays in page memory and clears on refresh.
+
+If a request fails, its unanswered user turn is removed from both history
+and the display, and the message draft is restored for retrying. Failed
+requests never add an assistant message. Replies continue to display as
+plain text. Press **Ctrl+C** in each server window to stop it.
 
 ### Test the API directly
 
@@ -134,12 +140,26 @@ Invoke-RestMethod `
   -Uri "http://127.0.0.1:8000/chat" `
   -Method Post `
   -ContentType "application/json" `
-  -Body '{"message":"Hello"}' |
+  -Body '{"messages":[{"role":"user","content":"Hello"}]}' |
   ConvertTo-Json
 ```
 
-The request contains only a `message` string. The response has this shape;
-Qwen's wording will vary:
+The request contains a nonempty `messages` list. Each entry has a `role`
+(`user` or `assistant`) and nonblank string `content`. Roles alternate,
+starting and ending with `user`. For a follow-up, include the previous
+messages and Qwen's exact previous response:
+
+```json
+{
+  "messages": [
+    {"role": "user", "content": "What year was the Eiffel Tower completed?"},
+    {"role": "assistant", "content": "It was completed in 1889."},
+    {"role": "user", "content": "What event was it built for?"}
+  ]
+}
+```
+
+The response still has this shape; Qwen's wording will vary:
 
 ```json
 {"response": "Hello! How can I help?"}
