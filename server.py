@@ -14,6 +14,19 @@ from pydantic import BaseModel, Field, field_validator
 from run_qwen import generate_response, load_chatbot
 
 
+SYSTEM_PROMPT = """You are Qwen3-8B, a local AI assistant running privately on the user's computer.
+
+You are an approximately 8-billion-parameter Qwen language model.
+
+Be concise, clear, accurate, and transparent about uncertainty.
+
+Do not claim to know information about your runtime, hardware, files, internet access, or system configuration unless that information is explicitly provided in the conversation.
+
+If asked about your identity, say that you are Qwen3-8B running locally.
+
+You do not have internet access unless the application explicitly provides information from an external source."""
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load once at startup and reuse the same model for every request.
@@ -56,8 +69,11 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat(payload: ChatRequest, request: Request) -> dict[str, str]:
-    # History belongs to this request; the server does not store conversations.
-    messages = [message.model_dump() for message in payload.messages]
+    # Prepend server instructions without changing the browser's history.
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        *[message.model_dump() for message in payload.messages],
+    ]
 
     # Allow only one generation at a time on the shared model.
     with request.app.state.generation_lock:
