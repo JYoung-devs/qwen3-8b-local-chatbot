@@ -69,7 +69,7 @@ def print_runtime_info(model):
 
 
 def generate_response(tokenizer, model, messages):
-    # Qwen's chat template disables generated reasoning while preserving chat roles.
+    # Disable thinking for responsive answers; retain final-answer safety checks below.
     inputs = tokenizer.apply_chat_template(
         messages,
         tokenize=True,
@@ -84,7 +84,7 @@ def generate_response(tokenizer, model, messages):
     with torch.inference_mode():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=800,
+            max_new_tokens=1200,
             do_sample=True,
             temperature=0.7,
             top_p=0.8,
@@ -94,8 +94,31 @@ def generate_response(tokenizer, model, messages):
 
     # Decode only the new tokens, not the prompt or conversation history.
     prompt_length = inputs["input_ids"].shape[1]
-    generated_tokens = outputs[0, prompt_length:]
-    return tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
+    generated_tokens = outputs[0, prompt_length:].tolist()
+    failure = "Qwen did not produce a complete final answer. Please try again."
+    eos_token_ids = model.generation_config.eos_token_id
+    if isinstance(eos_token_ids, int):
+        eos_token_ids = [eos_token_ids]
+    if not generated_tokens or generated_tokens[-1] not in (eos_token_ids or []):
+        # A token-budget cutoff must not expose unfinished thinking or an answer.
+        raise RuntimeError(failure)
+
+    # Follow Qwen's documented split after the last closing thinking token.
+    thinking_start = tokenizer.convert_tokens_to_ids("<think>")
+    thinking_end = tokenizer.convert_tokens_to_ids("</think>")
+    if thinking_end in generated_tokens:
+        final_start = len(generated_tokens) - generated_tokens[::-1].index(thinking_end)
+        final_tokens = generated_tokens[final_start:]
+    elif thinking_start in generated_tokens:
+        raise RuntimeError(failure)
+    else:
+        # Tag-free answers are valid when thinking is disabled.
+        final_tokens = generated_tokens
+
+    answer = tokenizer.decode(final_tokens, skip_special_tokens=True).strip()
+    if not answer or "<think" in answer.lower() or "</think" in answer.lower():
+        raise RuntimeError(failure)
+    return answer
 
 
 def chat_loop(tokenizer, model):

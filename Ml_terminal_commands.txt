@@ -1,0 +1,71 @@
+QWEN LOCAL DEVELOPMENT COMMANDS
+================================
+
+1. DIRECT MODEL TEST
+--------------------
+
+cd / PowerShell location:
+
+Set-Location "C:\Users\James\ml-projects"
+
+Run Qwen directly:
+
+.\qwen-env\Scripts\python.exe .\run_qwen.py
+
+Type:
+quit
+
+to exit the Qwen terminal chat.
+
+
+2. START QWEN / FASTAPI BACKEND
+--------------------------------
+
+Set-Location "C:\Users\James\ml-projects"
+
+.\qwen-env\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 8000 --workers 1
+
+Backend:
+http://127.0.0.1:8000
+
+
+3. START EIFFEL TOWER WEBSITE
+------------------------------
+
+Open a second terminal.
+
+Set-Location "C:\Users\James\Desktop\HTML CS website"
+
+C:\Users\James\ml-projects\qwen-env\Scripts\python.exe -m http.server 5500 --bind 127.0.0.1
+
+Website:
+http://127.0.0.1:5500
+
+AI Guide:
+http://127.0.0.1:5500/qwen-ai/qwen.html
+
+
+4. GPU MONITORING
+-----------------
+
+nvidia-smi -lms 500
+
+Ctrl+C to stop monitoring.
+
+
+5. NORMAL SHUTDOWN
+------------------
+
+In the FastAPI terminal:
+Ctrl+C
+
+In the website-server terminal:
+Ctrl+C
+
+
+6. CHECK SERVERS ARE OFF
+-------------------------
+
+Get-NetTCPConnection -LocalPort 8000,5500 -State Listen
+
+No matching/listening connections = both servers are stopped.
