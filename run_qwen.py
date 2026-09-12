@@ -84,7 +84,7 @@ def generate_response(tokenizer, model, messages):
     with torch.inference_mode():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=300,
+            max_new_tokens=800,
             do_sample=True,
             temperature=0.7,
             top_p=0.8,

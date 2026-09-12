@@ -83,12 +83,23 @@ dependencies or build step. It stays separate from the Eiffel Tower school
 website and uses no API keys or external AI service.
 
 ```text
+Source, documentation, and configuration (tracked in Git):
 run_qwen.py       Local model loading, generation, and terminal chat
 server.py         FastAPI backend that reuses run_qwen.py
 web/
   index.html     Chat page
   style.css      Page styling
   app.js         Browser requests and conversation display
+requirements.txt Pinned Python dependencies
+README.md        Project guide and local start instructions
+.gitignore       Keeps local infrastructure and generated files out of Git
+
+Required local infrastructure (ignored by Git; keep in place):
+models/Qwen3-8B/  Local model weights, tokenizer, and configuration
+qwen-env/        Existing Python environment and installed packages
+
+Generated files (ignored by Git; safe to remove):
+__pycache__/     Python bytecode cache, recreated automatically when needed
 
 Browser -> JavaScript fetch -> FastAPI -> local Qwen3-8B -> browser
 ```
@@ -123,8 +134,10 @@ Click **Send** or press **Enter** to submit; **Shift+Enter** adds a new line.
 While Qwen generates, the controls are disabled and the page shows
 `Qwen is thinking...`. The browser keeps user and assistant messages in a
 JavaScript array and sends the whole conversation with each request. FastAPI
-validates that list and passes it to Qwen without storing any conversation
-on the server. History stays in page memory and clears on refresh.
+validates that list and prepends the fixed `SYSTEM_PROMPT` from `server.py`
+before passing it to Qwen, without storing any conversation on the server.
+The system prompt is never added to browser history. History stays in page
+memory and clears on refresh.
 
 If a request fails, its unanswered user turn is removed from both history
 and the display, and the message draft is restored for retrying. Failed
