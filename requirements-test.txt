@@ -1,0 +1,4 @@
+# Install only the API dependencies for model-free contract tests.
+# This deliberately avoids downloading PyTorch/Transformers and Qwen weights.
+fastapi==0.141.1
+httpx==0.28.1
