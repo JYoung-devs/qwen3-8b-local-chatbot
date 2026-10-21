@@ -1,195 +1,168 @@
-# Local Qwen3-8B Chatbot
+# Qwen3-8B — Local AI Chatbot
 
-A small chatbot that runs Qwen3-8B locally with Hugging Face Transformers
-and PyTorch. It loads the model with 4-bit NF4 quantization and uses BF16
-for computation. Both the terminal chatbot and standalone browser prototype
-retain context during the current conversation.
+A local language-model application built with **Python, PyTorch, Hugging Face Transformers and FastAPI**. It runs pretrained **Qwen3-8B** weights on an NVIDIA GPU using **4-bit NF4 quantisation**, and provides both a terminal chatbot and a browser interface.
+
+**Local model inference · CUDA acceleration · No hosted LLM API · Multi-turn chat**
+
+> [!NOTE]
+> This repository contains the **application source**, not Qwen's pretrained model weights or a hosted demo. To run the chatbot, supply the model files and a compatible local NVIDIA/Python environment as described below.
+
+## What it does
+
+| Component | Implementation |
+| --- | --- |
+| **Model** | Qwen3-8B, loaded from local files through Hugging Face Transformers |
+| **Inference** | PyTorch with BitsAndBytes NF4 4-bit weights and BF16 computation |
+| **Terminal app** | Interactive, multi-turn CLI in `run_qwen.py` |
+| **HTTP API** | FastAPI `POST /chat`, with validated conversation messages |
+| **Browser app** | Dependency-free HTML, CSS and JavaScript with a small Markdown renderer |
+| **Privacy model** | Local inference and loopback-bound development servers; no external LLM API |
 
 ## Architecture
 
-```text
-User text -> chat template/tokenizer -> Qwen3-8B -> PyTorch/CUDA -> NVIDIA GPU -> generated tokens
+```mermaid
+flowchart TD
+    CLI["Terminal chatbot"] --> INFER["run_qwen.py<br/>tokenisation · generation"]
+    WEB["Browser chatbot<br/>HTML · CSS · JavaScript"] -->|"POST /chat"| API["FastAPI server.py<br/>validation · system prompt · request lock"]
+    API --> INFER
+    INFER --> MODEL["Qwen3-8B<br/>4-bit NF4 · BF16 · PyTorch/CUDA"]
 ```
 
-The application uses Qwen's chat-template switch to disable visible thinking
-output during ordinary chat. Model and device details printed at startup come
-from the loaded configuration and runtime rather than from generated text.
+The two interfaces share one inference implementation. The browser sends its conversation history to the local API; the API validates the messages, prepends its system prompt and calls the model. The model is loaded **once per API process**, and API generations are serialised to avoid concurrent use of the same model instance.
 
-## Local model files
+The browser keeps conversation context only for the current page session. The server does not maintain user chat history between requests or provide user accounts.
 
-Model weights are **not included in this repository**. Place a complete local
-Qwen3-8B model at:
+## Running locally (Windows + NVIDIA)
 
-```text
-models/Qwen3-8B
-```
+### Requirements
 
-The script sets `local_files_only=True`, so it does not download missing model
-files. The `models/` directory and common weight formats are ignored by Git.
-Do not force-add them or use Git LFS for this project.
+- **Python 3.12** (the documented local setup used Python 3.12.10).
+- A compatible **NVIDIA GPU**, driver and CUDA-enabled PyTorch installation.
+- A complete local copy of the **Qwen3-8B** model (weights, configuration and tokenizer).
+- Python dependencies listed in [`requirements.txt`](requirements.txt).
 
-## Windows setup
+The documented setup used **PyTorch 2.13.0+cu130**. CUDA wheels are platform-specific: choose the appropriate installation command from the [official PyTorch selector](https://pytorch.org/get-started/locally/) rather than assuming a generic `pip install torch` selects the right build.
 
-The existing environment can be activated and used directly:
+### 1. Prepare the environment and model
 
-```powershell
-.\qwen-env\Scripts\Activate.ps1
-python .\run_qwen.py
-```
-
-Alternatively, create a compatible environment:
+From the repository root in PowerShell:
 
 ```powershell
 py -3.12 -m venv qwen-env
 .\qwen-env\Scripts\Activate.ps1
 python -m pip install --upgrade pip
+
+# Install a compatible CUDA-enabled PyTorch build first (see link above).
+python -m pip install -r requirements.txt
 ```
 
-For NVIDIA acceleration, install the Windows CUDA build of PyTorch appropriate
-for the installed driver using the official PyTorch installation selector.
-CUDA-specific wheels may require a PyTorch package index, so the correct index
-URL is intentionally not guessed here. The tested environment uses Python
-3.12.10 and PyTorch 2.13.0+cu130.
+Place your complete downloaded model at:
 
-After installing the appropriate PyTorch wheel, install the remaining pinned
-dependencies:
-
-```powershell
-python -m pip install -r .\requirements.txt
+```text
+models/
+└── Qwen3-8B/
+    ├── config.json
+    ├── tokenizer_config.json
+    └── ... model weights and tokenizer files
 ```
 
-The current runtime also requires an NVIDIA GPU supported by BitsAndBytes for
-the configured 4-bit NF4 loading mode.
+The loader uses `local_files_only=True`; it **does not download missing weights at runtime**. The `models/` and `qwen-env/` directories are excluded from Git.
 
-## Run the terminal chatbot
-
-From the project directory:
+### 2. Start the terminal chatbot
 
 ```powershell
 .\qwen-env\Scripts\python.exe .\run_qwen.py
 ```
 
-Enter messages at the `You:` prompt. Conversation history is retained for
-follow-up questions. Type `quit` or `exit` to stop.
+Type at the `You:` prompt. Enter `quit` or `exit` to leave. The program prints the detected model architecture, parameter count, quantisation mode and device at startup.
 
-The virtual environment, model files, caches, and `.env` files are ignored
-because they are machine-specific, generated, very large, or potentially
-sensitive. Only the source and reproducibility documentation belong in Git.
+### 3. Start the browser chatbot
 
-## Run the standalone web prototype
+Open **two PowerShell terminals** in the repository root.
 
-The browser prototype uses plain HTML, CSS, and JavaScript with no frontend
-dependencies or build step. It stays separate from the Eiffel Tower school
-website and uses no API keys or external AI service.
-
-```text
-Source, documentation, and configuration (tracked in Git):
-run_qwen.py       Local model loading, generation, and terminal chat
-server.py         FastAPI backend that reuses run_qwen.py
-web/
-  index.html     Chat page
-  style.css      Page styling
-  app.js         Browser requests and conversation display
-requirements.txt Pinned Python dependencies
-README.md        Project guide and local start instructions
-.gitignore       Keeps local infrastructure and generated files out of Git
-
-Required local infrastructure (ignored by Git; keep in place):
-models/Qwen3-8B/  Local model weights, tokenizer, and configuration
-qwen-env/        Existing Python environment and installed packages
-
-Generated files (ignored by Git; safe to remove):
-__pycache__/     Python bytecode cache, recreated automatically when needed
-
-Browser -> JavaScript fetch -> FastAPI -> local Qwen3-8B -> browser
-```
-
-Install the dependencies using the Windows setup instructions above. Then
-open two PowerShell windows in the project directory.
-
-In the first window, start the backend:
+**Terminal A — API:**
 
 ```powershell
 .\qwen-env\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Wait for `Application startup complete` and leave this window running.
-The tokenizer and model load once at startup, and generation requests are
-processed one at a time. Keep one worker and omit automatic reload to avoid
-extra model loads. After changing `server.py`, stop and restart the backend.
-
-In the second window, serve only the frontend directory:
+**Terminal B — static web server:**
 
 ```powershell
 .\qwen-env\Scripts\python.exe -m http.server 5500 --bind 127.0.0.1 --directory web
 ```
 
-Open [the local chat](http://127.0.0.1:5500/) in your browser. Use this HTTP
-address so the page has an allowed origin. CORS allows only
-`http://127.0.0.1:5500` and `http://localhost:5500`, with POST requests and
-the Content-Type header. Both servers bind to this computer's loopback
-address and should remain local during development.
+Visit **http://127.0.0.1:5500/**. Keep both terminals open while using the chat. Do not enable multiple Uvicorn workers or automatic reload for this setup: each worker could load another copy of the model.
 
-Click **Send** or press **Enter** to submit; **Shift+Enter** adds a new line.
-While Qwen generates, the controls are disabled and the page shows
-`Qwen is thinking...`. The browser keeps user and assistant messages in a
-JavaScript array and sends the whole conversation with each request. FastAPI
-validates that list and prepends the fixed `SYSTEM_PROMPT` from `server.py`
-before passing it to Qwen, without storing any conversation on the server.
-The system prompt is never added to browser history. History stays in page
-memory and clears on refresh.
+## API contract
 
-If a request fails, its unanswered user turn is removed from both history
-and the display, and the message draft is restored for retrying. Failed
-requests never add an assistant message. User messages display as plain
-text. Qwen replies support a small Markdown subset: bold, headings (# to
-###), flat bullet and numbered lists, paragraphs, line breaks, and inline
-code. The renderer creates DOM elements and text nodes; raw HTML stays
-literal text, and links/images are not activated. This is not a full
-Markdown parser. History always stores Qwen's original unformatted response.
-Press **Ctrl+C** in each server window to stop it.
-
-### Test the API directly
-
-With the backend running, use another PowerShell window:
-
-```powershell
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8000/chat" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"messages":[{"role":"user","content":"Hello"}]}' |
-  ConvertTo-Json
-```
-
-The request contains a nonempty `messages` list. Each entry has a `role`
-(`user` or `assistant`) and nonblank string `content`. Roles alternate,
-starting and ending with `user`. For a follow-up, include the previous
-messages and Qwen's exact previous response:
+**Request:** `POST http://127.0.0.1:8000/chat`
 
 ```json
 {
   "messages": [
-    {"role": "user", "content": "What year was the Eiffel Tower completed?"},
-    {"role": "assistant", "content": "It was completed in 1889."},
-    {"role": "user", "content": "What event was it built for?"}
+    { "role": "user", "content": "When was the Eiffel Tower completed?" },
+    { "role": "assistant", "content": "It was completed in 1889." },
+    { "role": "user", "content": "What event was it built for?" }
   ]
 }
 ```
 
-The response still has this shape; Qwen's wording will vary:
+**Response shape:**
 
 ```json
-{"response": "Hello! How can I help?"}
+{ "response": "...model-generated text..." }
 ```
 
-## Known warning
+The conversation must be nonempty, alternate `user`/`assistant` roles, start with a user message and end with a user message. Invalid requests receive validation errors. The browser sends the complete session history on each turn, and restores the draft if an API request fails.
 
-The tested Windows environment may print:
+Only the local browser origins `127.0.0.1:5500` and `localhost:5500` are CORS-allowed. The server is intended for **local development**, not deployment on the public internet.
+
+## Implementation details
+
+- **Generation:** Qwen's chat template is applied with `enable_thinking=False`, followed by sampled decoding (`temperature=0.7`, `top_p=0.8`, `top_k=20`).
+- **Output handling:** The script decodes only newly generated tokens, checks for a normal end-of-sequence token and rejects visibly incomplete thinking output.
+- **UI:** Multi-turn history, Enter-to-send / Shift+Enter newline, loading/error states, responsive layout and safe text-node-based rendering of a limited Markdown subset.
+- **Separation:** `run_qwen.py` can run alone in the terminal; `server.py` reuses its loader and generator without duplicating model code.
+
+### Source layout
 
 ```text
-triton not found; flop counting will not work for triton kernels
+run_qwen.py             Local model loading, text generation and terminal chat
+server.py               FastAPI /chat endpoint and request validation
+web/
+  index.html            Standalone browser chat
+  style.css             Responsive UI styling
+  app.js                API calls, chat state and safe Markdown rendering
+requirements.txt        Runtime dependencies
+requirements-test.txt   Lightweight API-test dependencies
+tests/test_api.py       Tests with a stubbed model (no GPU required)
+.github/workflows/      CI for lightweight API tests
 ```
 
-This warning concerns optional FLOP accounting. The BitsAndBytes CUDA backend,
-model loading, and inference continue to work normally.
+The same `/chat` API is also used by an Eiffel Tower school-website integration maintained in a separate project; its source is not included here.
+
+## Tests
+
+The lightweight tests cover the API request contract, system-prompt forwarding, invalid conversations and CORS. They **stub model loading and inference**: they do not test CUDA performance or the actual Qwen responses, and they require no downloaded model weights.
+
+```powershell
+.\qwen-env\Scripts\python.exe -m pip install -r requirements-test.txt
+.\qwen-env\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+GitHub Actions runs these lightweight checks on pushes and pull requests.
+
+## Current limitations
+
+- No token streaming; the browser displays each reply when generation finishes.
+- Chat history lives in memory and clears on refresh; no persistent accounts or storage.
+- The full conversation is resent for each turn without context-window truncation.
+- Single-user, loopback-only prototype; **not** a public hosted service.
+- No fine-tuning, retrieval-augmented generation or external tool access.
+
+A `triton not found; flop counting will not work for triton kernels` warning has appeared in the documented Windows setup. It concerns optional FLOP accounting; it did not prevent local inference in that environment.
+
+## Project scope
+
+This project demonstrates **local deployment and application integration of an existing LLM**, not training a new model from scratch. Pretrained Qwen weights are not redistributed here. The model, Python environment, caches and local configuration remain outside version control.
